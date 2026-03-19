@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>ARIA — Industrial AI</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Syne:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --bg0:#040810; --bg1:#070d1a; --bg2:#0c1526; --bg3:#101d33;
+  --b: rgba(56,189,248,0.1);
+  --c1:#38bdf8; --c2:#818cf8; --c3:#34d399; --c4:#f472b6;
+  --warn:#fbbf24; --crit:#f87171;
+  --text:#e2e8f0; --t2:#94a3b8; --t3:#475569;
+  --mono:'JetBrains Mono',monospace;
+  --display:'Syne',sans-serif;
+  --glow1: 0 0 30px rgba(56,189,248,0.12);
+  --glow2: 0 0 30px rgba(129,140,248,0.12);
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;background:var(--bg0);color:var(--text);font-family:var(--mono);overflow:hidden;}
+::-webkit-scrollbar{width:4px;} ::-webkit-scrollbar-track{background:var(--bg1);} ::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:2px;}
+
+/* ── LAYOUT ── */
+.shell{display:grid;grid-template-rows:56px 1fr;height:100vh;}
+.body {display:grid;grid-template-columns:320px 1fr 340px;height:calc(100vh - 56px);overflow:hidden;}
+
+/* ── HEADER ── */
+header{
+  background:var(--bg1);border-bottom:1px solid var(--b);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 20px;position:relative;overflow:hidden;
+}
+header::before{
+  content:'';position:absolute;left:0;top:0;right:0;bottom:0;
+  background:linear-gradient(90deg,transparent,rgba(56,189,248,0.03),transparent);
+  animation:scan 4s linear infinite;
+}
+@keyframes scan{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+
+.logo{display:flex;align-items:center;gap:12px;}
+.logo-mark{
+  width:36px;height:36px;border-radius:8px;
+  background:linear-gradient(135deg,#0c1e3a,#1a3a6a);
+  border:1px solid rgba(56,189,248,0.3);
+  display:flex;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;
+}
+.logo-mark::after{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(circle at 30% 30%,rgba(56,189,248,0.3),transparent 60%);
+}
+.logo-mark span{font-family:var(--display);font-weight:800;font-size:13px;color:var(--c1);position:relative;z-index:1;}
+.logo-info{}
+.logo-name{font-family:var(--display);font-weight:700;font-size:16px;color:var(--text);letter-spacing:1px;}
+.logo-sub{font-size:9px;color:var(--t3);letter-spacing:2px;text-transform:uppercase;margin-top:1px;}
+
+.header-center{display:flex;align-items:center;gap:20px;}
+.health-pill{
+  display:flex;align-items:center;gap:8px;
+  background:var(--bg2);border:1px solid var(--b);
+  padding:6px 16px;border-radius:20px;
+}
+.health-score-big{font-family:var(--display);font-size:20px;font-weight:800;transition:color 0.5s;}
+.health-label-pill{font-size:10px;color:var(--t2);letter-spacing:1.5px;text-transform:uppercase;}
+
+.header-right{display:flex;align-items:center;gap:12px;}
+.conn-dot{width:8px;height:8px;border-radius:50%;background:#f87171;transition:background 0.3s;}
+.conn-dot.on{background:var(--c3);animation:pulse-dot 2s infinite;}
+@keyframes pulse-dot{0%,100%{box-shadow:0 0 0 0 rgba(52,211,153,0.4)}50%{box-shadow:0 0 0 6px rgba(52,211,153,0)}}
+.ts{font-size:11px;color:var(--t3);}
+.diagnose-btn{
+  font-family:var(--mono);font-size:11px;font-weight:500;
+  background:linear-gradient(135deg,rgba(56,189,248,0.15),rgba(129,140,248,0.15));
+  border:1px solid rgba(56,189,248,0.3);
+  color:var(--c1);padding:6px 14px;border-radius:6px;
+  cursor:pointer;transition:0.2s;letter-spacing:0.5px;
+}
+.diagnose-btn:hover{background:linear-gradient(135deg,rgba(56,189,248,0.25),rgba(129,140,248,0.25));transform:translateY(-1px);}
+.diagnose-btn:disabled{opacity:0.4;cursor:not-allowed;transform:none;}
+
+/* ── LEFT PANEL: SENSOR HEALTH ── */
+.left{background:var(--bg1);border-right:1px solid var(--b);padding:14px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;}
+
+.section-tag{font-size:9px;color:var(--t3);letter-spacing:2px;text-transform:uppercase;display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+.section-tag::after{content:'';flex:1;height:1px;background:var(--b);}
+
+/* Health ring card */
+.health-ring-card{
+  background:var(--bg2);border:1px solid var(--b);border-radius:12px;
+  padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px;
+}
+.ring-wrap{position:relative;width:120px;height:120px;}
+.ring-svg{width:100%;height:100%;transform:rotate(-90deg);}
+.ring-track{fill:none;stroke:var(--bg3);stroke-width:8;}
+.ring-fill{fill:none;stroke-width:8;stroke-linecap:round;transition:stroke-dasharray 1s ease,stroke 0.5s;}
+.ring-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.ring-num{font-family:var(--display);font-size:26px;font-weight:800;}
+.ring-unit{font-size:9px;color:var(--t3);letter-spacing:1px;margin-top:-2px;}
+.ring-status{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;font-weight:600;}
+
+/* Sensor bars */
+.sensor-bar-card{
+  background:var(--bg2);border:1px solid var(--b);
+  border-radius:10px;padding:12px;
+  border-left:3px solid transparent;transition:border-color 0.3s;
+}
+.sb-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.sb-name{font-size:10px;color:var(--t2);text-transform:uppercase;letter-spacing:1px;}
+.sb-val{font-family:var(--display);font-size:17px;font-weight:700;transition:color 0.3s;}
+.sb-unit{font-size:10px;color:var(--t3);margin-left:2px;}
+.sb-score-row{display:flex;justify-content:space-between;align-items:center;margin-top:6px;}
+.sb-track{flex:1;height:4px;background:var(--bg3);border-radius:2px;overflow:hidden;margin-right:8px;}
+.sb-fill{height:100%;border-radius:2px;transition:width 1s ease,background 0.5s;}
+.sb-score-num{font-size:10px;color:var(--t3);min-width:32px;text-align:right;}
+.sb-pred{font-size:9px;margin-top:4px;letter-spacing:0.5px;}
+
+/* ── CENTER PANEL: CHART + AI REPORT ── */
+.center{display:flex;flex-direction:column;overflow:hidden;}
+
+.chart-panel{
+  background:var(--bg1);border-bottom:1px solid var(--b);
+  padding:16px;flex-shrink:0;
+}
+.chart-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.chart-title{font-family:var(--display);font-size:13px;font-weight:600;color:var(--c1);}
+.chart-meta{font-size:10px;color:var(--t3);}
+.chart-wrap{height:160px;position:relative;}
+
+.report-panel{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;}
+
+.report-card{
+  background:var(--bg2);border:1px solid var(--b);border-radius:12px;
+  overflow:hidden;animation:fade-up 0.4s ease;
+}
+@keyframes fade-up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.report-header{
+  padding:10px 14px;display:flex;justify-content:space-between;align-items:center;
+  border-bottom:1px solid var(--b);
+  background:linear-gradient(90deg,rgba(56,189,248,0.05),transparent);
+}
+.report-type{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--c1);}
+.report-score{font-size:11px;color:var(--t2);}
+.report-ts{font-size:9px;color:var(--t3);}
+.report-body{padding:14px;font-size:12px;line-height:1.8;color:var(--t2);white-space:pre-wrap;}
+
+.typing-indicator{display:flex;gap:4px;padding:14px;}
+.typing-dot{width:6px;height:6px;border-radius:50%;background:var(--c1);animation:typing-anim 1.2s infinite;}
+.typing-dot:nth-child(2){animation-delay:0.2s;}
+.typing-dot:nth-child(3){animation-delay:0.4s;}
+@keyframes typing-anim{0%,60%,100%{transform:translateY(0);opacity:0.4}30%{transform:translateY(-6px);opacity:1}}
+
+.empty-state{text-align:center;padding:40px 20px;color:var(--t3);}
+.empty-title{font-family:var(--display);font-size:14px;color:var(--t2);margin-bottom:6px;}
+.empty-sub{font-size:11px;line-height:1.6;}
+
+/* ── RIGHT PANEL: CHAT ── */
+.right{background:var(--bg1);border-left:1px solid var(--b);display:flex;flex-direction:column;overflow:hidden;}
+
+.chat-header{padding:14px 16px;border-bottom:1px solid var(--b);display:flex;align-items:center;gap:10px;}
+.aria-avatar{
+  width:32px;height:32px;border-radius:50%;
+  background:linear-gradient(135deg,rgba(129,140,248,0.3),rgba(56,189,248,0.3));
+  border:1px solid rgba(129,140,248,0.4);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--display);font-size:12px;font-weight:700;color:var(--c2);
+}
+.aria-info{}
+.aria-name-tag{font-family:var(--display);font-size:13px;font-weight:600;color:var(--text);}
+.aria-status-tag{font-size:9px;color:var(--c3);letter-spacing:1px;}
+
+.chat-messages{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px;}
+
+.msg{display:flex;gap:8px;animation:fade-up 0.3s ease;}
+.msg.user{flex-direction:row-reverse;}
+
+.msg-avatar{width:26px;height:26px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;margin-top:2px;}
+.msg.aria .msg-avatar{background:rgba(129,140,248,0.2);color:var(--c2);}
+.msg.user .msg-avatar{background:rgba(56,189,248,0.2);color:var(--c1);}
+
+.msg-bubble{max-width:240px;padding:10px 12px;border-radius:10px;font-size:11px;line-height:1.7;}
+.msg.aria .msg-bubble{background:var(--bg2);border:1px solid var(--b);color:var(--t2);border-radius:2px 10px 10px 10px;}
+.msg.user .msg-bubble{background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.2);color:var(--c1);border-radius:10px 2px 10px 10px;}
+
+.msg-ts{font-size:8px;color:var(--t3);margin-top:3px;}
+
+.chat-input-area{padding:12px;border-top:1px solid var(--b);}
+.suggested{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;}
+.suggest-chip{
+  font-size:9px;color:var(--t2);background:var(--bg2);border:1px solid var(--b);
+  padding:3px 8px;border-radius:10px;cursor:pointer;transition:0.15s;letter-spacing:0.3px;
+}
+.suggest-chip:hover{border-color:rgba(56,189,248,0.4);color:var(--c1);}
+.chat-form{display:flex;gap:8px;}
+.chat-input{
+  flex:1;font-family:var(--mono);font-size:11px;
+  background:var(--bg2);border:1px solid var(--b);
+  color:var(--text);padding:8px 12px;border-radius:8px;outline:none;
+  transition:border-color 0.2s;
+}
+.chat-input:focus{border-color:rgba(56,189,248,0.4);}
+.chat-send{
+  font-family:var(--mono);font-size:11px;
+  background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.3);
+  color:var(--c1);padding:8px 12px;border-radius:8px;cursor:pointer;transition:0.2s;
+}
+.chat-send:hover{background:rgba(56,189,248,0.2);}
+.chat-send:disabled{opacity:0.3;cursor:not-allowed;}
+
+/* score color helpers */
+.score-healthy  {color:var(--c3);}
+.score-degraded {color:var(--warn);}
+.score-warning  {color:#fb923c;}
+.score-critical {color:var(--crit);}
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">
+      <div class="logo-mark"><span>AI</span></div>
+      <div class="logo-info">
+        <div class="logo-name">ARIA</div>
+        <div class="logo-sub">Autonomous Real-time Industrial AI</div>
+      </div>
+    </div>
+
+    <div class="header-center">
+      <div class="health-pill">
+        <div>
+          <div class="health-score-big" id="bigScore">--</div>
+        </div>
+        <div>
+          <div style="font-size:9px;color:var(--t3);letter-spacing:1px;">HEALTH</div>
+          <div class="health-label-pill" id="bigLabel">CONNECTING</div>
+        </div>
+      </div>
+      <button class="diagnose-btn" id="diagBtn" onclick="requestDiagnosis()">
+        [ Run Full Diagnosis ]
+      </button>
+    </div>
+
+    <div class="header-right">
+      <div class="conn-dot" id="connDot"></div>
+      <div class="ts" id="tsDisplay">--:--:-- UTC</div>
+    </div>
+  </header>
+
+  <div class="body">
+
+    <!-- LEFT: SENSOR HEALTH -->
+    <div class="left">
+      <div class="section-tag">Machine Health Score</div>
+
+      <!-- Big ring -->
+      <div class="health-ring-card">
+        <div class="ring-wrap">
+          <svg class="ring-svg" viewBox="0 0 120 120">
+            <circle class="ring-track" cx="60" cy="60" r="52"/>
+            <circle class="ring-fill" id="ringFill" cx="60" cy="60" r="52"
+              stroke-dasharray="0 327" stroke="var(--c3)"/>
+          </svg>
+          <div class="ring-center">
+            <div class="ring-num score-healthy" id="ringNum">--</div>
+            <div class="ring-unit">/100</div>
+          </div>
+        </div>
+        <div class="ring-status score-healthy" id="ringStatus">INITIALIZING</div>
+      </div>
+
+      <div class="section-tag">Sensor Analysis</div>
+
+      <!-- Sensor bars: injected by JS -->
+      <div id="sensorBars"></div>
+    </div>
+
+    <!-- CENTER: CHART + REPORTS -->
+    <div class="center">
+      <div class="chart-panel">
+        <div class="chart-header">
+          <div class="chart-title">Health Score -- Live Timeline</div>
+          <div class="chart-meta" id="chartMeta">Waiting for data...</div>
+        </div>
+        <div class="chart-wrap"><canvas id="healthChart"></canvas></div>
+      </div>
+
+      <div class="report-panel" id="reportPanel">
+        <div class="empty-state">
+          <div class="empty-title">ARIA Diagnosis Reports</div>
+          <div class="empty-sub">Click "Run Full Diagnosis" or wait for ARIA<br>to auto-analyze when anomalies are detected.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: CHAT -->
+    <div class="right">
+      <div class="chat-header">
+        <div class="aria-avatar">AI</div>
+        <div class="aria-info">
+          <div class="aria-name-tag">ARIA</div>
+          <div class="aria-status-tag" id="ariaStatus">Initializing...</div>
+        </div>
+      </div>
+
+      <div class="chat-messages" id="chatMessages">
+        <!-- Welcome message injected by JS -->
+      </div>
+
+      <div class="chat-input-area">
+        <div class="suggested" id="suggestions">
+          <span class="suggest-chip" onclick="sendSuggestion(this)">Overall health?</span>
+          <span class="suggest-chip" onclick="sendSuggestion(this)">Worst sensor?</span>
+          <span class="suggest-chip" onclick="sendSuggestion(this)">Any critical alerts?</span>
+          <span class="suggest-chip" onclick="sendSuggestion(this)">Maintenance needed?</span>
+          <span class="suggest-chip" onclick="sendSuggestion(this)">Temperature status?</span>
+          <span class="suggest-chip" onclick="sendSuggestion(this)">Vibration analysis?</span>
+        </div>
+        <div class="chat-form">
+          <input class="chat-input" id="chatInput" placeholder="Ask ARIA anything about your factory..." 
+                 onkeydown="if(event.key==='Enter')sendChat()"/>
+          <button class="chat-send" id="sendBtn" onclick="sendChat()">Send</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ───────────────────────────────────────────────────────────────────
+const CIRC = 2 * Math.PI * 52;  // ring circumference
+
+const SENSOR_LABELS = {
+  temperature: 'Temperature', humidity: 'Humidity', pressure: 'Pressure',
+  vibration: 'Vibration', power: 'Power', flow_rate: 'Flow Rate'
+};
+
+// ── STATE ────────────────────────────────────────────────────────────────────
+let healthChart  = null;
+let chartLabels  = [];
+let chartData    = [];
+let currentScore = 0;
+let wsReady      = false;
+let ws           = null;
+let waiting      = false;
+
+// ── CHART ────────────────────────────────────────────────────────────────────
+function initChart() {
+  const ctx = document.getElementById('healthChart').getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, 0, 160);
+  grad.addColorStop(0, 'rgba(56,189,248,0.2)');
+  grad.addColorStop(1, 'rgba(56,189,248,0)');
+
+  healthChart = new Chart(ctx, {
+    type: 'line',
+    data: { labels: chartLabels, datasets: [{
+      data: chartData,
+      borderColor: '#38bdf8',
+      backgroundColor: grad,
+      borderWidth: 1.5,
+      fill: true,
+      tension: 0.4,
+      pointRadius: 0,
+      pointHoverRadius: 5,
+    }]},
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0c1526',
+          borderColor: 'rgba(56,189,248,0.2)', borderWidth: 1,
+          titleColor: '#94a3b8', bodyColor: '#e2e8f0',
+          titleFont: { family: 'JetBrains Mono', size: 10 },
+          bodyFont:  { family: 'JetBrains Mono', size: 12 },
+          callbacks: { label: (c) => ` Health: ${c.raw}/100` }
+        },
+      },
+      scales: {
+        x: { ticks: { color: '#334155', font: { family: 'JetBrains Mono', size: 9 }, maxTicksLimit: 8 }, grid: { color: 'rgba(56,189,248,0.04)' }, border: { color: 'rgba(56,189,248,0.08)' } },
+        y: { min: 0, max: 100, ticks: { color: '#334155', font: { family: 'JetBrains Mono', size: 9 }, stepSize: 25 }, grid: { color: 'rgba(56,189,248,0.04)' }, border: { color: 'rgba(56,189,248,0.08)' } },
+      },
+    },
+  });
+}
+
+// ── SCORE COLOR ──────────────────────────────────────────────────────────────
+function scoreColor(s) {
+  if (s >= 75) return 'var(--c3)';
+  if (s >= 50) return 'var(--warn)';
+  if (s >= 25) return '#fb923c';
+  return 'var(--crit)';
+}
+function scoreClass(s) {
+  if (s >= 75) return 'score-healthy';
+  if (s >= 50) return 'score-degraded';
+  if (s >= 25) return 'score-warning';
+  return 'score-critical';
+}
+
+// ── HEALTH UPDATE ────────────────────────────────────────────────────────────
+function updateHealth(health) {
+  const score  = health.overall;
+  const label  = health.overall_label;
+  const color  = scoreColor(score);
+  const cls    = scoreClass(score);
+
+  // Header
+  const bigScore = document.getElementById('bigScore');
+  bigScore.textContent = score;
+  bigScore.style.color = color;
+  document.getElementById('bigLabel').textContent = label;
+
+  // Ring
+  const fill = document.getElementById('ringFill');
+  fill.setAttribute('stroke-dasharray', `${(score/100)*CIRC} ${CIRC}`);
+  fill.style.stroke = color;
+  const ringNum = document.getElementById('ringNum');
+  ringNum.textContent = score;
+  ringNum.className = 'ring-num ' + cls;
+  const ringStatus = document.getElementById('ringStatus');
+  ringStatus.textContent = label;
+  ringStatus.className = 'ring-status ' + cls;
+
+  // Chart
+  const ts = health.timestamp.slice(11,19);
+  if (chartLabels.length > 80) { chartLabels.shift(); chartData.shift(); }
+  chartLabels.push(ts);
+  chartData.push(score);
+  healthChart.update('none');
+  document.getElementById('chartMeta').textContent = `Overall: ${score}/100 -- Updated ${ts} UTC`;
+
+  // Sensor bars
+  renderSensorBars(health.sensors);
+
+  // ARIA status
+  document.getElementById('ariaStatus').textContent =
+    score >= 75 ? 'All systems nominal' :
+    score >= 50 ? 'Monitoring anomalies' : 'Active fault detected';
+
+  currentScore = score;
+}
+
+// ── SENSOR BARS ──────────────────────────────────────────────────────────────
+function renderSensorBars(sensors) {
+  const container = document.getElementById('sensorBars');
+  const keys = ['temperature','vibration','pressure','flow_rate','power','humidity'];
+
+  container.innerHTML = keys.map(key => {
+    const s   = sensors[key];
+    if (!s) return '';
+    const col = scoreColor(s.score);
+    const cls = scoreClass(s.score);
+    const pred = s.prediction;
+    const predText = pred.risk === 'critical' ? `FAILURE in ~${pred.eta_minutes}m` :
+                     pred.risk === 'high'     ? `Risk: HIGH (~${pred.eta_minutes}m)` :
+                     pred.risk === 'medium'   ? `Degrading (${pred.eta_minutes}m)` :
+                     pred.risk === 'low'      ? 'Trend: stable' : '';
+    const predColor = pred.risk === 'critical' ? 'var(--crit)' :
+                      pred.risk === 'high'     ? '#fb923c' :
+                      pred.risk === 'medium'   ? 'var(--warn)' : 'var(--t3)';
+
+    return `
+      <div class="sensor-bar-card" style="border-left-color:${col}">
+        <div class="sb-header">
+          <div class="sb-name">${SENSOR_LABELS[key] || key}</div>
+          <div>
+            <span class="sb-val ${cls}">${s.value}</span>
+            <span class="sb-unit">${s.unit}</span>
+          </div>
+        </div>
+        <div class="sb-score-row">
+          <div class="sb-track">
+            <div class="sb-fill" style="width:${s.score}%;background:${col}"></div>
+          </div>
+          <div class="sb-score-num">${s.score}</div>
+        </div>
+        ${predText ? `<div class="sb-pred" style="color:${predColor}">${predText}</div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+// ── DIAGNOSIS REPORT ─────────────────────────────────────────────────────────
+function addReport(text, health, trigger) {
+  const panel = document.getElementById('reportPanel');
+  const empty = panel.querySelector('.empty-state');
+  if (empty) empty.remove();
+
+  const typing = panel.querySelector('.typing-indicator');
+  if (typing) typing.remove();
+
+  const score = health?.overall ?? '?';
+  const ts    = new Date().toLocaleTimeString();
+  const el    = document.createElement('div');
+  el.className = 'report-card';
+  el.innerHTML = `
+    <div class="report-header">
+      <div>
+        <div class="report-type">${trigger === 'manual' ? 'Manual Diagnosis' : 'Auto Analysis'}</div>
+        <div class="report-ts">${ts}</div>
+      </div>
+      <div class="report-score ${scoreClass(score)}">Health: ${score}/100</div>
+    </div>
+    <div class="report-body">${text}</div>`;
+
+  panel.insertBefore(el, panel.firstChild);
+  // Keep max 5 reports
+  while (panel.children.length > 5) panel.lastChild.remove();
+}
+
+function showTyping() {
+  const panel = document.getElementById('reportPanel');
+  const empty = panel.querySelector('.empty-state');
+  if (empty) empty.remove();
+
+  const el = document.createElement('div');
+  el.className = 'report-card typing-indicator';
+  el.innerHTML = `<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>`;
+  panel.insertBefore(el, panel.firstChild);
+}
+
+// ── CHAT ─────────────────────────────────────────────────────────────────────
+function addMessage(role, text) {
+  const container = document.getElementById('chatMessages');
+  const ts = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const el = document.createElement('div');
+  el.className = `msg ${role}`;
+  el.innerHTML = `
+    <div class="msg-avatar">${role === 'aria' ? 'AI' : 'ME'}</div>
+    <div>
+      <div class="msg-bubble">${text}</div>
+      <div class="msg-ts">${ts}</div>
+    </div>`;
+  container.appendChild(el);
+  container.scrollTop = container.scrollHeight;
+}
+
+function addChatTyping() {
+  const container = document.getElementById('chatMessages');
+  const el = document.createElement('div');
+  el.className = 'msg aria';
+  el.id = 'chatTyping';
+  el.innerHTML = `
+    <div class="msg-avatar">AI</div>
+    <div>
+      <div class="msg-bubble" style="padding:10px 16px;">
+        <div style="display:flex;gap:4px;">
+          <div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>
+        </div>
+      </div>
+    </div>`;
+  container.appendChild(el);
+  container.scrollTop = container.scrollHeight;
+}
+
+function removeChatTyping() {
+  document.getElementById('chatTyping')?.remove();
+}
+
+function sendSuggestion(chip) {
+  document.getElementById('chatInput').value = chip.textContent;
+  sendChat();
+}
+
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const msg   = input.value.trim();
+  if (!msg || !wsReady || waiting) return;
+
+  input.value = '';
+  addMessage('user', msg);
+  addChatTyping();
+  waiting = true;
+  document.getElementById('sendBtn').disabled = true;
+
+  ws.send(JSON.stringify({ type: 'chat', message: msg }));
+}
+
+async function requestDiagnosis() {
+  if (!wsReady || waiting) return;
+  waiting = true;
+  document.getElementById('diagBtn').disabled = true;
+  document.getElementById('diagBtn').textContent = '[ Analyzing... ]';
+  showTyping();
+  ws.send(JSON.stringify({ type: 'diagnose_now' }));
+}
+
+// ── WEBSOCKET ────────────────────────────────────────────────────────────────
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws`);
+
+  ws.onopen = () => {
+    wsReady = true;
+    document.getElementById('connDot').classList.add('on');
+    document.getElementById('ariaStatus').textContent = 'Online — Ready';
+    addMessage('aria', 'Systems online. I am ARIA - your factory AI. I am monitoring all sensors in real time. Ask me anything or run a full diagnosis.');
+  };
+
+  ws.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+
+    if (data.type === 'health_update' || data.type === 'auto_diagnosis') {
+      if (data.health) updateHealth(data.health);
+      document.getElementById('tsDisplay').textContent =
+        (data.health?.timestamp?.slice(11,19) || '--:--:--') + ' UTC';
+    }
+
+    if (data.type === 'auto_diagnosis') {
+      addReport(data.report, data.health, 'auto');
+      waiting = false;
+      const btn = document.getElementById('diagBtn');
+      btn.disabled = false;
+      btn.textContent = '[ Run Full Diagnosis ]';
+    }
+
+    if (data.type === 'chat_reply') {
+      removeChatTyping();
+      addMessage('aria', data.message);
+      if (data.health) updateHealth(data.health);
+      waiting = false;
+      document.getElementById('sendBtn').disabled = false;
+    }
+  };
+
+  ws.onclose = () => {
+    wsReady = false;
+    document.getElementById('connDot').classList.remove('on');
+    document.getElementById('ariaStatus').textContent = 'Reconnecting...';
+    setTimeout(connect, 3000);
+  };
+
+  setInterval(() => { if (ws?.readyState === 1) ws.send(JSON.stringify({ type: 'ping' })); }, 20000);
+}
+
+// ── BOOT ─────────────────────────────────────────────────────────────────────
+(async () => {
+  initChart();
+
+  // Load history
+  try {
+    const res  = await fetch('/api/history');
+    const hist = await res.json();
+    hist.forEach(h => {
+      chartLabels.push(h.ts.slice(11,19));
+      chartData.push(h.score);
+    });
+    healthChart.update('none');
+  } catch(e) {}
+
+  // Load past reports
+  try {
+    const res     = await fetch('/api/reports');
+    const reports = await res.json();
+    reports.slice(0,3).reverse().forEach(r => {
+      addReport(r.content, { overall: r.health_score }, r.trigger);
+    });
+  } catch(e) {}
+
+  connect();
+})();
+</script>
+</body>
+</html>
